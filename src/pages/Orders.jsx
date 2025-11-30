@@ -1,5 +1,5 @@
 // src/pages/Orders.jsx
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import MainContainer from '../components/MainContainer';
 import TableContainer from '@mui/material/TableContainer';
 import Table from '@mui/material/Table';
@@ -23,48 +23,99 @@ import DescriptionIcon from '@mui/icons-material/Description';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import IconButton from '@mui/material/IconButton';
+import { getOrders, createOrder, updateOrder, deleteOrder } from "../services/orderService";
+import { getProducts } from "../services/productService";
+import Tooltip from '@mui/material/Tooltip';
+import { format } from "date-fns";
+import Alert from '@mui/material/Alert';
+import CheckIcon from '@mui/icons-material/Check';
+import CloseIcon from '@mui/icons-material/Close';
+import Snackbar from '@mui/material/Snackbar';
 
 function Orders() {
-    const [tableData] = useState([
-        { id: 1, orderDescription: 'aa', productCount: 2, createdDate: '2141' },
-        { id: 2, orderDescription: 'aaa', productCount: 3, createdDate: '870' },
-        { id: 3, orderDescription: 'aga', productCount: 5, createdDate: '568' },
-        { id: 4, orderDescription: 'bbb', productCount: 1, createdDate: '123' },
-        { id: 5, orderDescription: 'ccc', productCount: 4, createdDate: '456' },
-        { id: 6, orderDescription: 'ddd', productCount: 2, createdDate: '789' },
-        { id: 7, orderDescription: 'eee', productCount: 6, createdDate: '101' },
-        { id: 8, orderDescription: 'fff', productCount: 3, createdDate: '202' },
-        { id: 9, orderDescription: 'ggg', productCount: 2, createdDate: '303' },
-        { id: 10, orderDescription: 'hhh', productCount: 5, createdDate: '404' },
-    ]);
-    const [productData] = useState([
-        { productName: 'MABA', productDescription: 'jhjhsdajhsdgkjs' },
-        { productName: 'MABA2', productDescription: 'jhjhsdajhsdgkjs2' },
-        { productName: 'MABA3', productDescription: 'jhjhsdajhsdgkjs3' },
-        { productName: 'MABA4', productDescription: 'jhjhsdajhsdgkjs4' },
-        { productName: 'MABA5', productDescription: 'jhjhsdajhsdgkjs5' },
-        { productName: 'MABA6', productDescription: 'jhjhsdajhsdgkjs6' },
-        { productName: 'MABA7', productDescription: 'jhjhsdajhsdgkjs7' },
-        { productName: 'MABA8', productDescription: 'jhjhsdajhsdgkjs8' },
-    ]);
-
-    const [page, setPage] = useState(0);
-    const [rowsPerPage, setRowsPerPage] = useState(5);
+    const [productData, setProductData] = useState([]);
+    const [orderData, setOrderData] = useState([]);
     const [openNewOrder, setOpenNewOrder] = useState(false);
     const [openEditDialog, setOpenEditDialog] = useState(false);
     const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
     const [openDiscardDialog, setOpenDiscardDialog] = useState(false);
     const [dialogType, setDialogType] = useState();
     const [activeEdit, setActiveEdit] = useState(0);
-    const [activeDelete, setActiveDelete] = useState(0);
+    const [activeDelete, setActiveDelete] = useState(null);
+    const [selectedProducts, setSelectedProducts] = useState([]);
+    const [orderDescription, setOrderDescription] = useState('');
+    const [page, setPage] = useState(1);
+    const [limit, setLimit] = useState(10);
+    const [totalPages, setTotalPages] = useState(1);
+    const [orderSeverity, setOrderSeverity] = useState('');
+    const [openOrderAlert, setOpenOrderAlert] = useState(false);
+    const [alertMessage, setAlertMessage] = useState('');
+    const [activeProducts, setActiveProducts] = useState([]);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        loadOrders();
+    }, [page, limit, loading]);
+
+    useEffect(() => {
+        loadProducts();
+    }, [loading]);
+
+    const loadOrders = async () => {
+        try {
+            const res = await getOrders(page, limit);
+            setOrderData(res.data);
+            setTotalPages(res.totalPages)
+        } catch (error) {
+            console.error('Error loading orders', error);
+        }
+    };
+
+    const handleFilterByIdOrDescription = async (e) => {
+
+        try {
+            const res = await getOrders(page, limit, e.target.value);
+            setOrderData(res.data);
+            setTotalPages(res.totalPages)
+        } catch (error) {
+            console.error('Error loading orders', error);
+        }
+    }
+
+    const handleClose = (event, reason) => {
+        if (reason === 'clickaway') {
+            return;
+        }
+
+        setOpenOrderAlert(false);
+    };
+
+    const loadProducts = async () => {
+        try {
+            const data = await getProducts();
+            setProductData(data);
+        } catch (error) {
+            console.error('Error loading products', error);
+        }
+    };
+
+    const handleSelectChange = (id, isSelected) => {
+        setSelectedProducts(prev => {
+            if (isSelected) {
+                return [...prev, id];
+            } else {
+                return prev.filter(pid => pid !== id);
+            }
+        });
+    };
 
     const handleChangePage = (event, newPage) => {
-        setPage(newPage);
+        setPage(newPage + 1);
     };
 
     const handleChangeRowsPerPage = (event) => {
-        setRowsPerPage(parseInt(event.target.value, 10));
-        setPage(0);
+        setLimit(parseInt(event.target.value));
+        setPage(1);
     };
 
     const handleNewOrderCancel = () => {
@@ -87,29 +138,93 @@ function Orders() {
         }
     }
 
-    const handleOpenEditDialog = (idx) => {
-        setActiveEdit(idx);
+    const handleOrderDescription = (event) => {
+        setOrderDescription(event.target.value);
+    }
+
+    const handleOpenEditDialog = (row) => {
+        setActiveEdit(row.id);
+        setOrderDescription(row.orderDescription);
+        setActiveProducts(row.OrderProductMaps);
         setOpenEditDialog(true);
     }
 
-    const handleDeleteOrder = (idx) => {
-        setActiveDelete(tableData[idx].id);
+    const handleDeleteOrder = (row) => {
+        setActiveDelete(row.id);
         setOpenDeleteDialog(true);
     }
 
-    const submitNewOrder = () => {
-        console.log('ORDER ADDED SUCCESSFULLY');
-        setOpenNewOrder(false);
+    const submitNewOrder = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+
+        const data = {
+            orderDescription,
+            productIds: selectedProducts
+        }
+        try {
+            const newOrder = await createOrder(data);
+            console.log('Order Created', newOrder)
+            setOpenOrderAlert(true);
+            setOrderSeverity('success');
+            setAlertMessage('Order Successfully Created')
+            setOpenNewOrder(false);
+            setOrderDescription('');
+            setSelectedProducts([]);
+        } catch (error) {
+            console.error('Error creating order', error);
+            setOpenOrderAlert(true);
+            setOrderSeverity('error');
+            setAlertMessage('Order Creation Error')
+        }
+        setLoading(false);
     }
 
-    const submitEditOrder = () => {
-        console.log('ORDER CHANGED SUCCESSFULLY');
-        setOpenEditDialog(false);
+    const submitEditOrder = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+
+        const data = {
+            orderDescription,
+            productIds: selectedProducts
+        }
+        try {
+            const newOrder = await updateOrder(activeEdit, data);
+            console.log('Order updated', newOrder)
+            setOpenOrderAlert(true);
+            setOrderSeverity('success');
+            setAlertMessage('Order Successfully Updated')
+            setOpenEditDialog(false);
+            setOrderDescription('');
+            setSelectedProducts([]);
+        } catch (error) {
+            console.error('Error updating order', error);
+            setOpenOrderAlert(true);
+            setOrderSeverity('error');
+            setAlertMessage('Order Updating Error')
+        }
+        setLoading(false);
     }
 
-    const submitDeleteOrder = () => {
-        console.log('ORDER DELETED SUCCESSFULLY');
-        setOpenDeleteDialog(false);
+    const submitDeleteOrder = async () => {
+        setLoading(true);
+        try {
+            const delOrder = await deleteOrder(activeDelete);
+            console.log('Order Deleted', delOrder)
+            setOpenOrderAlert(true);
+            setOrderSeverity('success');
+            setAlertMessage('Order Successfully Deleted!')
+            setOpenDeleteDialog(false);
+            setActiveDelete(null);
+            setLoading(false);
+        } catch (error) {
+            console.error('Error deleting order', error);
+            setOpenOrderAlert(true);
+            setOrderSeverity('error');
+            setAlertMessage('Order Deleting Error!')
+            setActiveDelete(null);
+        }
+        setLoading(false);
     }
 
 
@@ -118,22 +233,25 @@ function Orders() {
             <div style={{ textAlign: 'center', marginBottom: '20px' }}>
                 <h1>Order Management</h1>
             </div>
-            <TextField
-                id="outlined-basic"
-                label="Search By Order Description or ID"
-                variant="outlined"
-                style={{ width: '100%', marginBottom: '10px' }}
-                size="small"
-                slotProps={{
-                    input: {
-                        startAdornment: (
-                            <InputAdornment position="start">
-                                <SearchIcon />
-                            </InputAdornment>
-                        ),
-                    },
-                }}
-            />
+            <Tooltip title="Search by order Id or Order Description only">
+                <TextField
+                    id="filter_table"
+                    label="Search By Order Description or ID"
+                    variant="outlined"
+                    style={{ width: '100%', marginBottom: '10px' }}
+                    size="small"
+                    onChange={handleFilterByIdOrDescription}
+                    slotProps={{
+                        input: {
+                            startAdornment: (
+                                <InputAdornment position="start">
+                                    <SearchIcon />
+                                </InputAdornment>
+                            ),
+                        },
+                    }}
+                />
+            </Tooltip>
             <TableContainer component={Paper} style={{ marginBottom: '10px' }}>
                 <Table sx={{ minWidth: 650 }} aria-label="orders table">
                     <TableHead>
@@ -147,42 +265,40 @@ function Orders() {
                     </TableHead>
 
                     <TableBody>
-                        {tableData
-                            .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                            .map((row, idx) => (
-                                <TableRow
-                                    key={row.id}
-                                    sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
-                                >
-                                    <TableCell component="th" scope="row">{row.id}</TableCell>
-                                    <TableCell align="right">{row.orderDescription}</TableCell>
-                                    <TableCell align="right">{row.productCount}</TableCell>
-                                    <TableCell align="right">{row.createdDate}</TableCell>
-                                    <TableCell align="right">
-                                        <Grid container>
-                                            <Grid size={6}>
-                                                <IconButton aria-label="edit">
-                                                    <EditIcon onClick={() => handleOpenEditDialog(idx)} />
-                                                </IconButton>
-                                            </Grid>
-                                            <Grid size={6}>
-                                                <IconButton aria-label="delete">
-                                                    <DeleteIcon onClick={() => handleDeleteOrder(idx)} />
-                                                </IconButton>
-                                            </Grid>
+                        {orderData.map((row, idx) => (
+                            <TableRow
+                                key={row.id}
+                                sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
+                            >
+                                <TableCell component="th" scope="row">{row.id}</TableCell>
+                                <TableCell align="right">{row.orderDescription}</TableCell>
+                                <TableCell align="right">{row.OrderProductMaps.length}</TableCell>
+                                <TableCell align="right">{format(new Date(row.createdAt), "yyyy-MM-dd")}</TableCell>
+                                <TableCell align="right">
+                                    <Grid container>
+                                        <Grid size={6}>
+                                            <IconButton aria-label="edit">
+                                                <EditIcon onClick={() => handleOpenEditDialog(row)} />
+                                            </IconButton>
                                         </Grid>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
+                                        <Grid size={6}>
+                                            <IconButton aria-label="delete">
+                                                <DeleteIcon onClick={() => handleDeleteOrder(row)} />
+                                            </IconButton>
+                                        </Grid>
+                                    </Grid>
+                                </TableCell>
+                            </TableRow>
+                        ))}
                     </TableBody>
                 </Table>
 
                 <TablePagination
                     component="div"
-                    rowsPerPageOptions={[5, 10, 25, { label: 'All', value: -1 }]}
-                    count={tableData.length}
-                    rowsPerPage={rowsPerPage}
-                    page={page}
+                    rowsPerPageOptions={[5, 10, 20, 50]}
+                    count={totalPages * limit}
+                    rowsPerPage={limit}
+                    page={page - 1}
                     onPageChange={handleChangePage}
                     onRowsPerPageChange={handleChangeRowsPerPage}
                 />
@@ -194,7 +310,6 @@ function Orders() {
             >
                 New Order
             </Button>
-
             {/* New Order Dialog */}
             <Dialog
                 fullWidth={true}
@@ -202,45 +317,50 @@ function Orders() {
                 open={openNewOrder}
             >
                 <DialogTitle style={{ textAlign: 'center', padding: '0px' }}><h2>New Order</h2></DialogTitle>
-                <DialogContent>
-                    <TextField
-                        id="outlined-basic"
-                        label="Order Description"
-                        variant="outlined"
-                        style={{ width: '100%', marginTop: '10px' }}
-                        size="small"
-                        slotProps={{
-                            input: {
-                                startAdornment: (
-                                    <InputAdornment position="start">
-                                        <DescriptionIcon />
-                                    </InputAdornment>
-                                ),
-                            },
-                        }}
-                    />
-                    {productData.map((pd) => (
-                        <ProductItem key={pd.id} productData={pd} />
-                    ))}
-                </DialogContent>
-                <DialogActions>
-                    <Button
-                        variant="outlined"
-                        size="large"
-                        color="error"
-                        onClick={() => handleNewOrderCancel()}
-                    >
-                        Cancel
-                    </Button>
-                    <Button
-                        variant="contained"
-                        size="large"
-                        color="success"
-                        onClick={() => submitNewOrder()}
-                    >
-                        Submit
-                    </Button>
-                </DialogActions>
+                <form onSubmit={submitNewOrder}>
+                    <DialogContent>
+                        <Tooltip title="Enter a brief description for your order">
+                            <TextField
+                                id="outlined-basic"
+                                label="Order Description"
+                                variant="outlined"
+                                style={{ width: '100%', marginTop: '10px' }}
+                                size="small"
+                                onChange={handleOrderDescription}
+                                slotProps={{
+                                    input: {
+                                        startAdornment: (
+                                            <InputAdornment position="start">
+                                                <DescriptionIcon />
+                                            </InputAdornment>
+                                        ),
+                                    },
+                                }}
+                            />
+                        </Tooltip>
+                        {productData.map((pd) => (
+                            <ProductItem key={pd.id} productData={pd} onSelectChange={handleSelectChange} activeProducts={[]} />
+                        ))}
+                    </DialogContent>
+                    <DialogActions>
+                        <Button
+                            variant="outlined"
+                            size="large"
+                            color="error"
+                            onClick={() => handleNewOrderCancel()}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="contained"
+                            size="large"
+                            color="success"
+                            type="submit"
+                        >
+                            Submit
+                        </Button>
+                    </DialogActions>
+                </form>
             </Dialog>
 
             {/* Edit Order Dialog */}
@@ -250,46 +370,51 @@ function Orders() {
                 open={openEditDialog}
             >
                 <DialogTitle style={{ textAlign: 'center', padding: '0px' }}><h2>Edit Order</h2></DialogTitle>
-                <DialogContent>
-                    <TextField
-                        id="outlined-basic"
-                        label="Order Description"
-                        variant="outlined"
-                        style={{ width: '100%', marginTop: '10px' }}
-                        size="small"
-                        value={tableData[activeEdit].orderDescription}
-                        slotProps={{
-                            input: {
-                                startAdornment: (
-                                    <InputAdornment position="start">
-                                        <DescriptionIcon />
-                                    </InputAdornment>
-                                ),
-                            },
-                        }}
-                    />
-                    {productData.map((pd) => (
-                        <ProductItem key={pd.id} productData={pd} />
-                    ))}
-                </DialogContent>
-                <DialogActions>
-                    <Button
-                        variant="outlined"
-                        size="large"
-                        color="error"
-                        onClick={() => handleEditCancel()}
-                    >
-                        Cancel
-                    </Button>
-                    <Button
-                        variant="contained"
-                        size="large"
-                        color="success"
-                        onClick={() => submitEditOrder()}
-                    >
-                        Save
-                    </Button>
-                </DialogActions>
+                <form onSubmit={submitEditOrder}>
+                    <DialogContent>
+                        <Tooltip title="Enter a brief description for your order">
+                            <TextField
+                                id="outlined-basic"
+                                label="Order Description"
+                                variant="outlined"
+                                style={{ width: '100%', marginTop: '10px' }}
+                                size="small"
+                                value={orderDescription}
+                                onChange={handleOrderDescription}
+                                slotProps={{
+                                    input: {
+                                        startAdornment: (
+                                            <InputAdornment position="start">
+                                                <DescriptionIcon />
+                                            </InputAdornment>
+                                        ),
+                                    },
+                                }}
+                            />
+                        </Tooltip>
+                        {productData.map((pd) => (
+                            <ProductItem key={pd.id} productData={pd} onSelectChange={handleSelectChange} activeProducts={activeProducts} />
+                        ))}
+                    </DialogContent>
+                    <DialogActions>
+                        <Button
+                            variant="outlined"
+                            size="large"
+                            color="error"
+                            onClick={() => handleEditCancel()}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="contained"
+                            size="large"
+                            color="success"
+                            type='submit'
+                        >
+                            Save
+                        </Button>
+                    </DialogActions>
+                </form>
             </Dialog>
 
             {/* Delete Dialog */}
@@ -347,6 +472,16 @@ function Orders() {
                     </Button>
                 </DialogActions>
             </Dialog>
+
+            <Snackbar
+                open={openOrderAlert}
+                autoHideDuration={3000}
+                onClose={handleClose}
+            >
+                <Alert icon={orderSeverity === 'success' ? <CheckIcon /> : <CloseIcon />} severity={orderSeverity}>
+                    {alertMessage}
+                </Alert>
+            </Snackbar>
         </MainContainer>
     );
 }
