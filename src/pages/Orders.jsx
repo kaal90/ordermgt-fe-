@@ -277,14 +277,18 @@ function Orders() {
                                 <TableCell align="right">
                                     <Grid container>
                                         <Grid size={6}>
-                                            <IconButton aria-label="edit">
-                                                <EditIcon onClick={() => handleOpenEditDialog(row)} />
-                                            </IconButton>
+                                            <Tooltip title="Edit Order">
+                                                <IconButton aria-label="edit">
+                                                    <EditIcon onClick={() => handleOpenEditDialog(row)} />
+                                                </IconButton>
+                                            </Tooltip>
                                         </Grid>
                                         <Grid size={6}>
-                                            <IconButton aria-label="delete">
-                                                <DeleteIcon onClick={() => handleDeleteOrder(row)} />
-                                            </IconButton>
+                                            <Tooltip title="Delete Order">
+                                                <IconButton aria-label="delete">
+                                                    <DeleteIcon onClick={() => handleDeleteOrder(row)} />
+                                                </IconButton>
+                                            </Tooltip>
                                         </Grid>
                                     </Grid>
                                 </TableCell>
